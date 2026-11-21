@@ -348,3 +348,191 @@ cores_area <- c("Astronomia/Física" = "#2a78d6", "Química" = "#eb6834")
 # PARTE 3. ANÁLISES ESTATÍSTICAS
 # Cole o seu bloco (P1, P2, P3 ou P4) abaixo da última linha.
 # ==========================================================================
+
+
+# ==========================================================================
+# P3. Formação no exterior
+# Ano de referência: 2024
+# ==========================================================================
+
+# P3.1 Docentes por área e ano
+# Exclui programas com conceito "A" e evita duplicidade dentro da mesma área.
+
+p3_docentes <- dbGetQuery(con, "
+  SELECT DISTINCT ON (d.ano, a.nm_area, d.id_pessoa)
+         d.ano, a.nm_area, d.id_pessoa, p.nota, d.pais_titulacao
+  FROM sucupira.tab_docente d
+  JOIN sucupira.ref_programa p ON d.programa_id = p.id_prog
+  JOIN sucupira.ref_area a     ON p.area_id = a.id_area
+  WHERE p.nota <> 'A'
+  ORDER BY d.ano, a.nm_area, d.id_pessoa, p.nota DESC;") %>%
+  mutate(area = rotulo_area(nm_area),
+         nota = nota_categoria(nota),
+         exterior = pais_titulacao != "BRASIL")
+
+p3_doc24 <- filter(p3_docentes, ano == 2024)
+count(p3_doc24, area, exterior)
+
+
+# P3.2 Titulação no exterior por área e nota
+
+p3_prop <- p3_doc24 %>%
+  group_by(area, nota) %>%
+  summarise(n = n(), exterior = sum(exterior), .groups = "drop") %>%
+  rowwise() %>%
+  mutate(pct = 100 * exterior / n,
+         ic_inf = 100 * prop.test(exterior, n)$conf.int[1],
+         ic_sup = 100 * prop.test(exterior, n)$conf.int[2]) %>%
+  ungroup()
+p3_prop
+
+write_csv(p3_prop, nome_livre(pasta_tabelas, "P3_proporcao_exterior_por_nota_2024", "csv"))
+
+# Comparação entre as áreas
+p3_tab_area <- table(p3_doc24$area, p3_doc24$exterior)
+p3_tab_area
+p3_teste_area <- prop.test(p3_tab_area[, "TRUE"], rowSums(p3_tab_area))
+p3_teste_area
+
+
+# P3.3 Regressão logística
+# Nota 4 como categoria de referência
+p3_dados_mod <- mutate(p3_doc24, nota = relevel(nota, ref = "4"), area = factor(area))
+
+p3_modelo <- glm(exterior ~ area + nota, data = p3_dados_mod, family = binomial)
+summary(p3_modelo)
+
+# Interação área x nota
+p3_modelo_inter <- glm(exterior ~ area * nota, data = p3_dados_mod, family = binomial)
+p3_teste_inter <- anova(p3_modelo, p3_modelo_inter, test = "LRT")
+p3_teste_inter
+
+p3_razoes <- tibble(termo = names(coef(p3_modelo)),
+                    razao_chances = exp(coef(p3_modelo)),
+                    ic95_inf = exp(confint.default(p3_modelo)[, 1]),
+                    ic95_sup = exp(confint.default(p3_modelo)[, 2]),
+                    p_valor = summary(p3_modelo)$coefficients[, 4])
+p3_razoes
+
+write_csv(p3_razoes, nome_livre(pasta_tabelas, "P3_regressao_logistica_razoes_de_chance", "csv"))
+write_csv(tibble(teste = c("prop.test: exterior Fisica x Quimica",
+                           "LRT: modelo com interacao area x nota"),
+                 estatistica = c(unname(p3_teste_area$statistic), p3_teste_inter$Deviance[2]),
+                 gl = c(unname(p3_teste_area$parameter), p3_teste_inter$Df[2]),
+                 p_valor = c(p3_teste_area$p.value, p3_teste_inter$`Pr(>Chi)`[2])),
+          nome_livre(pasta_tabelas, "P3_testes", "csv"))
+
+
+#* P3.4 Gráficos -----------------------------------------------------------
+
+p3_tema <- theme_minimal(base_size = 12) +
+  theme(legend.position = "top", legend.justification = "left",
+        panel.grid.minor = element_blank(),
+        panel.grid.major.x = element_blank(),
+        panel.grid.major.y = element_line(color = "grey90"),
+        plot.title = element_text(face = "bold"),
+        plot.subtitle = element_text(color = "grey30"),
+        plot.caption = element_text(color = "grey40", hjust = 0, size = 9),
+        plot.title.position = "plot", plot.caption.position = "plot")
+
+p3_n24 <- count(p3_doc24, area)
+p3_rodape <- paste0("Docentes distintos de programas acadêmicos em 2024: Astronomia/Física n = ",
+                    p3_n24$n[p3_n24$area == "Astronomia/Física"], "; Química n = ",
+                    p3_n24$n[p3_n24$area == "Química"], ".")
+
+# Gráfico 1: Formação no exterior por nota
+p3_g1 <- ggplot(p3_prop, aes(x = nota, y = pct, color = area)) +
+  geom_errorbar(aes(ymin = ic_inf, ymax = ic_sup), width = 0.18, linewidth = 0.7,
+                position = position_dodge(width = 0.45)) +
+  geom_point(size = 3.2, position = position_dodge(width = 0.45)) +
+  scale_color_manual(values = cores_area, name = NULL) +
+  scale_y_continuous(labels = function(x) paste0(x, "%"),
+                     limits = c(0, 50), breaks = seq(0, 50, 10),
+                     expand = expansion(mult = c(0, 0.02))) +
+  labs(title = "Docentes com o último grau obtido no exterior",
+       subtitle = "Percentual por nota do programa e intervalo de 95% (2024)",
+       x = "Nota do programa (Avaliação Quadrienal 2017 a 2020)", y = NULL,
+       caption = paste0(p3_rodape,
+                        "\nIntervalos de Wilson. Programas novos (conceito A) excluídos; o único programa de nota 2 entra em \"3 ou menos\".",
+                        "\nFonte: CAPES, Dados Abertos (Sucupira).")) +
+  p3_tema
+
+p3_g1
+
+ggsave(nome_livre(pasta_figuras, "P3_exterior_por_nota", "pdf"), p3_g1,
+       width = 7.5, height = 4.8, device = cairo_pdf)
+ggsave(nome_livre(pasta_figuras, "P3_exterior_por_nota", "png"), p3_g1,
+       width = 7.5, height = 4.8, dpi = 300, bg = "white")
+
+# Gráfico 2: Países de titulação
+# Oito mais frequentes; demais agrupados em "Outros".
+p3_paises <- p3_doc24 %>%
+  filter(exterior) %>%
+  mutate(pais = fct_lump_n(str_to_title(pais_titulacao), n = 8, other_level = "Outros")) %>%
+  count(area, pais) %>%
+  left_join(rename(p3_n24, total_area = n), by = "area") %>%
+  mutate(pct = 100 * n / total_area)
+
+p3_ordem <- p3_paises %>%
+  filter(pais != "Outros") %>%
+  group_by(pais) %>% summarise(t = sum(n)) %>%
+  arrange(t) %>% pull(pais) %>% as.character()
+p3_paises <- mutate(p3_paises, pais = factor(pais, levels = c("Outros", p3_ordem)))
+
+write_csv(p3_paises, nome_livre(pasta_tabelas, "P3_paises_titulacao_exterior_2024", "csv"))
+
+p3_g2 <- ggplot(p3_paises, aes(x = pct, y = pais, fill = area, group = fct_rev(area))) +
+  geom_col(position = position_dodge(width = 0.8), width = 0.72,
+           color = "white", linewidth = 0.6) +
+  geom_text(aes(label = paste0(fmt(pct, 1), "%")),
+            position = position_dodge(width = 0.8),
+            hjust = -0.15, size = 3.2, color = "grey25") +
+  scale_fill_manual(values = cores_area, name = NULL) +
+  scale_x_continuous(labels = function(x) paste0(x, "%"),
+                     limits = c(0, max(p3_paises$pct) * 1.15),
+                     expand = expansion(mult = c(0, 0))) +
+  labs(title = "Onde os docentes titulados no exterior se formaram",
+       subtitle = "Percentual dos docentes de cada área, por país do último grau (2024)",
+       x = NULL, y = NULL,
+       caption = paste0(p3_rodape, "\nFonte: CAPES, Dados Abertos (Sucupira).")) +
+  p3_tema +
+  theme(panel.grid.major.y = element_blank(),
+        panel.grid.major.x = element_line(color = "grey90"))
+
+p3_g2
+
+ggsave(nome_livre(pasta_figuras, "P3_paises_titulacao", "pdf"), p3_g2,
+       width = 7.5, height = 5.2, device = cairo_pdf)
+ggsave(nome_livre(pasta_figuras, "P3_paises_titulacao", "png"), p3_g2,
+       width = 7.5, height = 5.2, dpi = 300, bg = "white")
+
+# Gráfico 3: Evolução 2021–2024
+p3_evolucao <- p3_docentes %>%
+  group_by(ano, area) %>%
+  summarise(n = n(), exterior = sum(exterior), .groups = "drop") %>%
+  mutate(pct = 100 * exterior / n)
+
+write_csv(p3_evolucao, nome_livre(pasta_tabelas, "P3_evolucao_exterior_2021_2024", "csv"))
+
+p3_g3 <- ggplot(p3_evolucao, aes(x = ano, y = pct, color = area)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 3) +
+  geom_text(data = filter(p3_evolucao, ano == max(ano)),
+            aes(label = area), hjust = 0, nudge_x = 0.08, size = 3.6, show.legend = FALSE) +
+  scale_color_manual(values = cores_area, guide = "none") +
+  scale_x_continuous(breaks = 2021:2024, expand = expansion(add = c(0.2, 1.1))) +
+  scale_y_continuous(labels = function(x) paste0(x, "%"),
+                     limits = c(0, max(p3_evolucao$pct) * 1.4),
+                     expand = expansion(mult = c(0, 0))) +
+  labs(title = "Formação no exterior ao longo do quadriênio",
+       subtitle = "Percentual de docentes com o último grau obtido no exterior (2021 a 2024)",
+       x = NULL, y = NULL,
+       caption = "Docentes distintos por ano e área; programas novos (conceito A) excluídos.\nFonte: CAPES, Dados Abertos (Sucupira).") +
+  p3_tema
+
+p3_g3
+
+ggsave(nome_livre(pasta_figuras, "P3_evolucao_exterior", "pdf"), p3_g3,
+       width = 7.5, height = 4.5, device = cairo_pdf)
+ggsave(nome_livre(pasta_figuras, "P3_evolucao_exterior", "png"), p3_g3,
+       width = 7.5, height = 4.5, dpi = 300, bg = "white")
