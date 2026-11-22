@@ -30,10 +30,10 @@ library(DBI)
 #   "restaurar": recria a base a partir da cópia mais recente em base/
 #                (não precisa dos CSVs; é o modo para quem clonou o repositório)
 #   "usar":      a base já existe no PostgreSQL; só conecta
-MODO_BASE <- "construir"
+MODO_BASE <- "restaurar"
 
 # Pasta do trabalho (onde ficam base/, figuras/ e tabelas/)
-pasta_trabalho <- "~/Downloads/dados_abertos_sucupira/trabalho_final_ferr_comp"
+pasta_trabalho <- "C:/Users/Marcos/Downloads/dados_abertos_sucupira/trabalho_final_ferr_comp"
 
 # Pasta com os 12 CSVs originais da CAPES (só usada no modo "construir")
 pasta_dados <- "~/Downloads/dados_abertos_sucupira"
@@ -536,3 +536,241 @@ ggsave(nome_livre(pasta_figuras, "P3_evolucao_exterior", "pdf"), p3_g3,
        width = 7.5, height = 4.5, device = cairo_pdf)
 ggsave(nome_livre(pasta_figuras, "P3_evolucao_exterior", "png"), p3_g3,
        width = 7.5, height = 4.5, dpi = 300, bg = "white")
+
+
+# ==========================================================================
+# P4. Mestres e doutores titulados no quadriênio
+# ==========================================================================
+
+#* P4.1 Titulados por ano, área e grau -------------------------------------
+# Todos os programas acadêmicos das duas áreas (inclui conceito "A").
+
+p4_por_ano <- dbGetQuery(con, "
+  SELECT t.ano, a.nm_area, t.grau, COUNT(*) AS titulados
+  FROM sucupira.tab_discente t
+  JOIN sucupira.ref_programa p ON t.programa_id = p.id_prog
+  JOIN sucupira.ref_area a     ON p.area_id = a.id_area
+  WHERE t.situacao = 'TITULADO'
+  GROUP BY t.ano, a.nm_area, t.grau
+  ORDER BY a.nm_area, t.grau, t.ano;") %>%
+  mutate(area = rotulo_area(nm_area),
+         titulados = as.integer(titulados),
+         grau = factor(str_to_title(grau), levels = c("Mestrado", "Doutorado")))
+
+p4_por_ano %>%
+  select(area, grau, ano, titulados) %>%
+  pivot_wider(names_from = ano, values_from = titulados) %>%
+  mutate(total = `2021` + `2022` + `2023` + `2024`)
+
+write_csv(p4_por_ano, nome_livre(pasta_tabelas, "P4_titulados_por_ano", "csv"))
+
+
+#* P4.2 Consulta: titulados e docentes-ano de cada programa ----------------
+
+p4_prog <- dbGetQuery(con, "
+  WITH doc AS (
+    SELECT programa_id, COUNT(*) AS docente_anos
+    FROM sucupira.tab_docente GROUP BY programa_id),
+  tit AS (
+    SELECT programa_id,
+           COUNT(*) FILTER (WHERE grau = 'MESTRADO')  AS mestres,
+           COUNT(*) FILTER (WHERE grau = 'DOUTORADO') AS doutores
+    FROM sucupira.tab_discente
+    WHERE situacao = 'TITULADO' GROUP BY programa_id)
+  SELECT p.id_prog, a.nm_area, p.grau, p.nota, doc.docente_anos,
+         COALESCE(tit.mestres, 0)  AS mestres,
+         COALESCE(tit.doutores, 0) AS doutores
+  FROM sucupira.ref_programa p
+  JOIN sucupira.ref_area a ON p.area_id = a.id_area
+  JOIN doc                 ON doc.programa_id = p.id_prog
+  LEFT JOIN tit            ON tit.programa_id = p.id_prog;") %>%
+  mutate(area = rotulo_area(nm_area),
+         across(c(docente_anos, mestres, doutores), as.integer),
+         tem_mestrado  = str_detect(grau, "MESTRADO"),
+         tem_doutorado = str_detect(grau, "DOUTORADO"))
+
+# Totais do quadriênio por área e titulados por docente por ano
+p4_totais <- p4_prog %>%
+  group_by(area) %>%
+  summarise(programas = n(), docente_anos = sum(docente_anos),
+            mestres = sum(mestres), doutores = sum(doutores)) %>%
+  mutate(mestres_por_docente_ano  = mestres / docente_anos,
+         doutores_por_docente_ano = doutores / docente_anos)
+p4_totais
+
+write_csv(p4_totais, nome_livre(pasta_tabelas, "P4_totais_quadrienio", "csv"))
+
+
+#* P4.3 Taxa por programa, por área e nota ---------------------------------
+
+p4_taxas <- p4_prog %>%
+  filter(nota != "A") %>%
+  mutate(nota = nota_categoria(nota)) %>%
+  pivot_longer(c(mestres, doutores),
+               names_to = "titulo", values_to = "titulados") %>%
+  filter((titulo == "mestres" & tem_mestrado) |
+           (titulo == "doutores" & tem_doutorado)) %>%
+  mutate(taxa = titulados / docente_anos,
+         titulo = factor(titulo, levels = c("mestres", "doutores"),
+                         labels = c("Mestres", "Doutores")))
+
+# Taxa do conjunto de cada área, só com os programas que oferecem o grau
+p4_por_area <- p4_taxas %>%
+  group_by(titulo, area) %>%
+  summarise(programas = n(), sem_titulados = sum(titulados == 0),
+            titulados = sum(titulados),
+            docente_anos = sum(docente_anos), .groups = "drop") %>%
+  mutate(taxa = titulados / docente_anos)
+p4_por_area
+
+# Taxa do conjunto de cada área e nota (soma dos titulados / soma dos
+# docentes-ano) e mediana das taxas dos programas
+p4_conj <- p4_taxas %>%
+  group_by(titulo, area, nota) %>%
+  summarise(programas = n(), titulados = sum(titulados),
+            docente_anos = sum(docente_anos),
+            mediana_programas = median(taxa), .groups = "drop") %>%
+  mutate(taxa = titulados / docente_anos)
+p4_conj
+
+write_csv(p4_por_area, nome_livre(pasta_tabelas, "P4_taxa_por_area", "csv"))
+write_csv(p4_conj, nome_livre(pasta_tabelas, "P4_taxa_por_area_e_nota", "csv"))
+
+
+#* P4.4 Regressão de Poisson com offset ------------------------------------
+
+p4_dados_dout <- p4_taxas %>%
+  filter(titulo == "Doutores", nota != "3 ou menos") %>%
+  mutate(nota = relevel(droplevels(nota), ref = "4"), area = factor(area))
+
+p4_mod_dout <- glm(
+  titulados ~ area + nota + offset(log(docente_anos)),
+  family = quasipoisson, data = p4_dados_dout)
+summary(p4_mod_dout)
+
+# A diferença entre as áreas é a mesma em todas as notas? (teste F)
+p4_inter_dout <- glm(
+  titulados ~ area * nota + offset(log(docente_anos)),
+  family = quasipoisson, data = p4_dados_dout)
+p4_teste_dout <- anova(p4_mod_dout, p4_inter_dout, test = "F")
+p4_teste_dout
+
+# Mestres: programas com mestrado
+p4_dados_mest <- p4_taxas %>%
+  filter(titulo == "Mestres") %>%
+  mutate(nota = relevel(nota, ref = "4"), area = factor(area))
+
+p4_mod_mest <- glm(
+  titulados ~ area + nota + offset(log(docente_anos)),
+  family = quasipoisson, data = p4_dados_mest)
+summary(p4_mod_mest)
+
+p4_inter_mest <- glm(
+  titulados ~ area * nota + offset(log(docente_anos)),
+  family = quasipoisson, data = p4_dados_mest)
+p4_teste_mest <- anova(p4_mod_mest, p4_inter_mest, test = "F")
+p4_teste_mest
+
+p4_razoes <- bind_rows(
+  tibble(modelo = "doutores", termo = names(coef(p4_mod_dout)),
+         razao_taxas = exp(coef(p4_mod_dout)),
+         ic95_inf = exp(confint.default(p4_mod_dout)[, 1]),
+         ic95_sup = exp(confint.default(p4_mod_dout)[, 2]),
+         p_valor = summary(p4_mod_dout)$coefficients[, 4]),
+  tibble(modelo = "mestres", termo = names(coef(p4_mod_mest)),
+         razao_taxas = exp(coef(p4_mod_mest)),
+         ic95_inf = exp(confint.default(p4_mod_mest)[, 1]),
+         ic95_sup = exp(confint.default(p4_mod_mest)[, 2]),
+         p_valor = summary(p4_mod_mest)$coefficients[, 4]))
+p4_razoes
+
+write_csv(p4_razoes, nome_livre(pasta_tabelas, "P4_razoes_de_taxas_quasipoisson", "csv"))
+write_csv(tibble(
+  item = c("dispersao (doutores)", "interacao area x nota (doutores): p",
+           "dispersao (mestres)", "interacao area x nota (mestres): p"),
+  valor = c(summary(p4_mod_dout)$dispersion, p4_teste_dout$`Pr(>F)`[2],
+            summary(p4_mod_mest)$dispersion, p4_teste_mest$`Pr(>F)`[2])),
+  nome_livre(pasta_tabelas, "P4_dispersao_e_interacao", "csv"))
+
+
+#* P4.5 Gráficos -----------------------------------------------------------
+
+p4_tema <- theme_minimal(base_size = 12) +
+  theme(legend.position = "top", legend.justification = "left",
+        panel.grid.minor = element_blank(),
+        panel.grid.major.x = element_blank(),
+        panel.grid.major.y = element_line(color = "grey90"),
+        strip.text = element_text(face = "bold", size = 12, hjust = 0),
+        plot.title = element_text(face = "bold"),
+        plot.subtitle = element_text(color = "grey30"),
+        plot.caption = element_text(color = "grey40", hjust = 0, size = 9),
+        plot.title.position = "plot", plot.caption.position = "plot")
+
+# Gráfico 1: titulados por ano, um painel por grau.
+p4_rodape_ano <- paste0(
+  "Total do quadriênio: Astronomia/Física ", p4_totais$mestres[1],
+  " mestres e ", p4_totais$doutores[1], " doutores; Química ",
+  p4_totais$mestres[2], " mestres e ", p4_totais$doutores[2],
+  " doutores.\nFonte: CAPES, Dados Abertos (Sucupira).")
+
+p4_g1 <- ggplot(p4_por_ano,
+                aes(x = ano, y = titulados, color = area)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 3) +
+  geom_text(aes(label = titulados), vjust = -1.1, size = 3.1,
+            color = "grey25") +
+  geom_text(data = filter(p4_por_ano, ano == max(ano)),
+            aes(label = area), hjust = 0, nudge_x = 0.12,
+            size = 3.4) +
+  facet_wrap(~ grau) +
+  scale_color_manual(values = cores_area, guide = "none") +
+  scale_x_continuous(breaks = 2021:2024,
+                     expand = expansion(add = c(0.25, 1.5))) +
+  scale_y_continuous(limits = c(0, 1000),
+                     expand = expansion(mult = c(0, 0))) +
+  labs(title = "Mestres e doutores titulados por ano",
+       subtitle = "Programas acadêmicos, 2021 a 2024",
+       x = NULL, y = "Titulados", caption = p4_rodape_ano) +
+  p4_tema
+
+p4_g1
+
+ggsave(nome_livre(pasta_figuras, "P4_titulados_por_ano", "pdf"), p4_g1,
+       width = 8.5, height = 4.6, device = cairo_pdf)
+ggsave(nome_livre(pasta_figuras, "P4_titulados_por_ano", "png"), p4_g1,
+       width = 8.5, height = 4.6, dpi = 300, bg = "white")
+
+# Gráfico 2: titulados por docente por ano. Cada ponto é um programa; o
+# traço horizontal é a taxa do conjunto daquela área e nota.
+p4_g2 <- ggplot(p4_taxas, aes(x = nota, y = taxa, color = area)) +
+  geom_point(position = position_jitterdodge(jitter.width = 0.18,
+                                             dodge.width = 0.7, seed = 1),
+             size = 1.9, alpha = 0.55) +
+  geom_errorbar(data = p4_conj, aes(ymin = taxa, ymax = taxa),
+                position = position_dodge(width = 0.7),
+                width = 0.55, linewidth = 1.1) +
+  facet_wrap(~ titulo) +
+  scale_color_manual(values = cores_area, name = NULL) +
+  scale_y_continuous(breaks = seq(0, 1, 0.2),
+                     labels = function(x) fmt(x, 1),
+                     limits = c(0, NA),
+                     expand = expansion(mult = c(0, 0.05))) +
+  labs(title = "Titulados por docente por ano, por nota do programa",
+       subtitle = "Ponto: um programa. Traço: taxa do conjunto da área e da nota (2021 a 2024)",
+       x = "Nota do programa (Avaliação Quadrienal 2017 a 2020)",
+       y = "Titulados por docente por ano",
+       caption = paste0(
+         "Taxa = titulados em 2021-2024 / docentes-ano do programa (permanentes e colaboradores). ",
+         "Cada grau só para os programas que o oferecem;\nconceito A excluído. ",
+         "Fonte: CAPES, Dados Abertos (Sucupira).")) +
+  p4_tema
+
+p4_g2
+
+ggsave(nome_livre(pasta_figuras, "P4_titulados_por_docente", "pdf"), p4_g2,
+       width = 9, height = 5, device = cairo_pdf)
+ggsave(nome_livre(pasta_figuras, "P4_titulados_por_docente", "png"), p4_g2,
+       width = 9, height = 5, dpi = 300, bg = "white")
+
+
+
