@@ -511,54 +511,95 @@
   \end{columns}
 \end{frame}
 
+
 % ====================================================================== 22
-\begin{frame}{P3 $\cdot$ Variável, modelo e gráfico dos países}
+\begin{frame}{P3 $\cdot$ Consulta e modelo}
   \begin{columns}[T]
-    \column{0.42\textwidth}
+    \column{0.64\textwidth}
     \trecho[codigomenor]{p3_variavel.R}
     \trecho[codigomenor]{p3_prog.R}
     \trecho[codigomenor]{p3_modelo.R}
-    \column{0.55\textwidth}
-    \trecho[codigomenor]{p3_ggplot.R}
+
+    \column{0.32\textwidth}
+    \small
+    \begin{itemize}
+      \item \cod{DISTINCT ON}: um docente por área e ano,
+      associado ao programa de maior nota
+
+      \item \cod{exterior}: último grau obtido
+      fora do Brasil (1) ou no Brasil (0)
+
+      \item \cod{prop.test}: comparação das
+      proporções entre as duas áreas
+
+      \item \cod{glm}: regressão logística
+      com área e nota como explicativas
+
+      \item \cod{anova}: teste da interação
+      área $\times$ nota
+    \end{itemize}
   \end{columns}
-  \vspace{0.5em}
-  \begin{itemize}
-    \item \cod{exterior}: o país da instituição do último grau do docente é diferente de Brasil
-    \item O modelo tem a mesma forma do usado na P2, com os titulados no exterior no lugar dos bolsistas
-  \end{itemize}
 \end{frame}
+
 
 % ====================================================================== 23
 \begin{frame}{P3 $\cdot$ Último grau no exterior por nota do programa}
   \begin{columns}[c]
     \column{0.63\textwidth}
-    \includegraphics[width=\linewidth]{figuras_v2/P3_exterior_por_nota_programas.pdf}
+    \includegraphics[width=\linewidth]
+      {figuras_v2/P3_exterior_por_nota.pdf}
+
     \column{0.34\textwidth}
     \small
     \begin{itemize}
-      \item 2024: 22,3\% dos docentes de Astronomia/Física (390 de 1749) e 8,6\% dos de Química (179 de 2090)
-      \item Razão de chances da Química: 0,36 (IC 95\% de 0,28 a 0,46)
-      \item Por ponto de nota: 1,37 (1,25 a 1,50)
-      \item Interação área $\times$ nota: $p = 0{,}52$ em categorias e $p = 0{,}14$ como tendência
-      \item Dispersão estimada: 1,55
+      \item 2024: 22,3\% em Astronomia/Física
+      e 8,6\% em Química
+
+      \item Comparação entre áreas:
+      $p < 0{,}001$
+
+      \item Química: razão de chances de
+      0,36 (IC 95\%: 0,29 a 0,43)
+
+      \item Nota 7: razão de chances de
+      3,01 (IC 95\%: 2,29 a 3,95),
+      em relação à nota 4
+
+      \item Interação área $\times$ nota:
+      $p = 0{,}27$
     \end{itemize}
   \end{columns}
 \end{frame}
+
 
 % ====================================================================== 24
 \begin{frame}{P3 $\cdot$ País do último grau}
   \begin{columns}[c]
     \column{0.60\textwidth}
-    \includegraphics[width=\linewidth]{figuras_v2/P3_paises_titulacao.pdf}
+    \includegraphics[width=\linewidth]
+      {figuras_v2/P3_paises_titulacao.pdf}
+
     \column{0.37\textwidth}
     \small
     \begin{itemize}
-      \item Estados Unidos, França e Reino Unido somam 195 docentes de Astronomia/Física (11,1\%) e 97 de Química (4,6\%)
-      \item Na Química a França vem antes dos Estados Unidos: 39 e 31 docentes
-      \item Os percentuais são sobre todos os docentes de cada área
+      \item Astronomia/Física:
+      Estados Unidos (4,9\%),
+      França e Reino Unido (3,1\% cada)
+
+      \item Química:
+      França (1,9\%), Estados Unidos
+      (1,5\%) e Reino Unido (1,3\%)
+
+      \item Os oito países mais frequentes
+      são apresentados separadamente
+
+      \item Os percentuais consideram
+      todos os docentes de cada área
     \end{itemize}
   \end{columns}
 \end{frame}
+
+
 
 % ====================================================================== 25
 \begin{frame}{Síntese da P3}
@@ -566,19 +607,37 @@
     \column{0.47\textwidth}
     \cab{Os dados mostram}
     \begin{itemize}
-      \item O último grau no exterior é mais frequente em Astronomia/Física em todas as notas
-      \item A proporção cresce com a nota, sem evidência de que o crescimento difira entre as áreas
-      \item De 2021 a 2024 os percentuais ficaram perto de 22\% em Astronomia/Física e de 9\% na Química
+      \item O último grau no exterior é
+      significativamente mais frequente
+      em Astronomia/Física
+
+      \item As notas 5, 6 e 7 apresentam
+      maiores chances de formação no
+      exterior em relação à nota 4
+
+      \item Não foi detectada interação
+      significativa entre área e nota
+
+      \item De 2021 a 2024, a diferença
+      entre as áreas permaneceu estável
     \end{itemize}
+
     \column{0.47\textwidth}
     \cab{Os dados não permitem afirmar}
     \begin{itemize}
-      \item Quantos docentes tiveram experiência no exterior: doutorado sanduíche e pós-doutorado não estão na base
-      \item Quantos são brasileiros que se titularam fora e quantos são estrangeiros contratados no Brasil
-      \item Que a titulação no exterior explique a nota do programa
+      \item Quantos docentes realizaram
+      doutorado sanduíche ou pós-doutorado
+
+      \item Quantos são brasileiros
+      titulados no exterior ou
+      estrangeiros contratados no Brasil
+
+      \item Que a formação no exterior
+      determine a nota do programa
     \end{itemize}
   \end{columns}
 \end{frame}
+
 
 % ====================================================================== 26
 \begin{frame}{P4 $\cdot$ Gráfico dos titulados por ano}
@@ -676,7 +735,7 @@
     \addlinespace
     \textbf{P2} & Em programas de mesma nota, a bolsa de produtividade é menos frequente na Química (razão de chances 0,52) e cresce com a nota (1,49 por ponto). \\
     \addlinespace
-    \textbf{P3} & O último grau no exterior é menos frequente na Química (razão de chances 0,36) e cresce com a nota (1,37 por ponto). \\
+    \textbf{P3} & O último grau no exterior é mais frequente em Astronomia/Física (22,3\%) do que em Química (8,6\%). A razão de chances ajustada da Química é 0,36, e a nota 7 apresenta razão de chances de 3,01 em relação à nota 4. \\
     \addlinespace
     \textbf{P4} & A Química titulou 3461 mestres e 2609 doutores; Astronomia/Física, 2222 e 1511. Por docente, a razão de taxas é 1,29 para mestres e 1,49 para doutores. \\
     \bottomrule
