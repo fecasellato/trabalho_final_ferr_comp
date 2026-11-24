@@ -11,7 +11,6 @@
 \usepackage{tikz}
 \usetikzlibrary{positioning,arrows.meta,fit}
 
-% ---------- estilo: minimalista, preto e cinza ----------
 \usefonttheme{serif}
 \setbeamersize{text margin left=7mm, text margin right=7mm}
 \setbeamertemplate{navigation symbols}{}
@@ -27,9 +26,6 @@
 
 \definecolor{cinza}{gray}{0.42}
 
-% ---------- código: cópia literal dos arquivos do trabalho ----------
-% Os trechos em trechos/ são gerados por extrai_trechos.py a partir de
-% trabalho_final_ferr_comp.R, 03_verificacao.sql e dos blocos P1 a P4.
 \lstdefinestyle{codigo}{
   basicstyle=\ttfamily\fontsize{6.5}{7.9}\selectfont,
   columns=fullflexible, keepspaces=true, showstringspaces=false,
@@ -61,19 +57,18 @@
 
 \begin{document}
 
-% ====================================================================== 1
 \begin{frame}[plain]
   \titlepage
 \end{frame}
 
-% ====================================================================== 2
 \begin{frame}{Contexto}
   \begin{columns}[T]
     \column{0.56\textwidth}
     \begin{itemize}
-      \item Um integrante do grupo já trabalhou com os dados da Plataforma Sucupira: 1976 docentes de química, ano de 2016
-      \item Naquele estudo o processamento foi todo em R, sem base de dados, e as planilhas eram cruzadas a cada análise
-      \item Aqui os dados de 2021 a 2024 de duas áreas de avaliação são organizados em uma base relacional
+      \item Um integrante do grupo (Fernando) já trabalhou com os dados da Plataforma Sucupira: 1976 docentes de química, ano de 2016
+      \item Naquele estudo o processamento foi todo em R, sem base de dados, sem IA!!
+      \item As planilhas eram cruzadas por, principalmente, \cod{left\_join} e \cod{merge}
+      \item Aqui usamos dados atualizados de 2021 a 2024 da Química e da Física, organizados em uma base relacional com auxílio da IA, sem o escopo e rigor de um contexto de pesquisa 
     \end{itemize}
     \column{0.38\textwidth}
     \vspace{0.6em}
@@ -85,7 +80,6 @@
   \end{columns}
 \end{frame}
 
-% ====================================================================== 3
 \begin{frame}{Plataforma Sucupira e dados desagregados}
   \begin{columns}[c]
     \column{0.56\textwidth}
@@ -94,17 +88,15 @@
     \column{0.41\textwidth}
     \begin{itemize}
       \item Os programas informam seus dados à CAPES pela Plataforma Sucupira
-      \item O portal de Dados Abertos publica um conjunto por tema e um CSV por ano
-      \item Programas, Docentes e Discentes, de 2021 a 2024: 12 arquivos, cerca de 1 GB
+      \item De 2021 a 2024 (quadriênio): 12 arquivos desagregados, cerca de 1 GB
       \item Uma linha por docente ou discente, com os dados do programa repetidos
-      \item O código do programa liga um arquivo ao outro
+      \item O código do programa liga docentes e discentes ao programa; área e instituição vêm da planilha de Programas, e o \cod{ID\_PESSOA} (anonimizado) identifica a mesma pessoa entre anos, sem ligar docente a discente
     \end{itemize}
   \end{columns}
   \vspace{0.4em}
   \fonte{Portal Dados Abertos CAPES, conjunto ``[2021 a 2024] Discentes da Pós-Graduação Stricto Sensu no Brasil''}
 \end{frame}
 
-% ====================================================================== 4
 \begin{frame}{Objetivo e perguntas}
   \begin{block}{}
     Construir uma base de dados relacional em PostgreSQL com as 12 planilhas e usá-la para comparar os programas acadêmicos de Astronomia/Física e de Química
@@ -129,7 +121,6 @@
   \end{columns}
 \end{frame}
 
-% ====================================================================== 5
 \begin{frame}{Etapas do processamento}
   \centering
   \vspace{1em}
@@ -161,7 +152,6 @@
   \end{itemize}
 \end{frame}
 
-% ====================================================================== 6
 \begin{frame}{Tabelas de referência e tabelas de dados}
   \centering
   \begin{tikzpicture}[
@@ -201,7 +191,6 @@
   \end{columns}
 \end{frame}
 
-% ====================================================================== 7
 \begin{frame}{Chaves primárias e estrangeiras}
   \trecho[codigomedio]{base_chaves.R}
   \vspace{0.6em}
@@ -219,7 +208,6 @@
   \end{columns}
 \end{frame}
 
-% ====================================================================== 8
 \begin{frame}{Leitura e filtragem dos CSVs}
   \trecho[codigomaior]{base_leitura.R}
   \vspace{0.6em}
@@ -237,7 +225,6 @@
   \end{columns}
 \end{frame}
 
-% ====================================================================== 9
 \lstdefinestyle{codigocarga}{style=codigo,
   basicstyle=\ttfamily\fontsize{6.2}{7.5}\selectfont}
 \begin{frame}{Carga no PostgreSQL}
@@ -258,7 +245,6 @@
   \end{columns}
 \end{frame}
 
-% ====================================================================== 10
 \begin{frame}{Consultas com JOIN}
   \begin{columns}[T]
     \column{0.49\textwidth}
@@ -290,58 +276,6 @@
   \end{columns}
 \end{frame}
 
-% ====================================================================== 11
-\begin{frame}{Unidade de análise e leitura dos testes}
-  \begin{columns}[T]
-    \column{0.50\textwidth}
-    \begin{itemize}
-      \item Região e nota são atributos do programa, repetidos em todos os seus docentes
-      \item Docentes de um mesmo programa não são observações independentes
-      \item Os testes e os modelos usam o programa como observação
-      \item A base contém todos os programas das duas áreas: o p-valor compara a diferença observada com a variação entre programas, sem erro de amostragem envolvido
-      \item As relações encontradas são associações
-    \end{itemize}
-    \column{0.46\textwidth}
-    \cab{Área $\times$ região, 2024}
-    \footnotesize\setlength{\tabcolsep}{2.8pt}
-    \begin{tabular}{@{}lrlr@{}}
-      \toprule
-      observação & $n$ & teste & $p$ \\
-      \midrule
-      vínculo de docente & 4124 & qui-quadrado & $<0{,}001$ \\
-      programa & 134 & exato de Fisher & $0{,}28$ \\
-      \bottomrule
-    \end{tabular}
-
-    \vspace{0.8em}
-    \begin{itemize}
-      \item Com os docentes como observações, $\chi^2 = 121{,}1$ (4 graus de liberdade)
-      \item O mesmo cruzamento com os 134 programas não rejeita a hipótese de distribuições iguais
-    \end{itemize}
-  \end{columns}
-\end{frame}
-
-% ====================================================================== 12
-\begin{frame}{P1 $\cdot$ Consulta e testes}
-  \begin{columns}[T]
-    \column{0.64\textwidth}
-    \trecho{p1_consulta.R}
-    \trecho{p1_fisher.R}
-    \trecho{p1_wilcox.R}
-    \trecho{p1_kruskal.R}
-    \column{0.32\textwidth}
-    \small
-    \begin{itemize}
-      \item \cod{GROUP BY}: uma linha por programa com docentes em 2024
-      \item Fisher: tabela área $\times$ região, com células de 2 a 4 programas
-      \item Mann-Whitney: nota comparada entre as duas áreas
-      \item Kruskal-Wallis: nota comparada entre as cinco regiões
-      \item A nota entra como escala ordenada, sem supor normalidade
-    \end{itemize}
-  \end{columns}
-\end{frame}
-
-% ====================================================================== 13
 \begin{frame}{P1 $\cdot$ Programas e docentes por região}
   \begin{columns}[c]
     \column{0.65\textwidth}
@@ -350,30 +284,13 @@
     \small
     \begin{itemize}
       \item Sudeste: 32 dos 62 programas de Astronomia/Física (52\%) e 25 dos 72 de Química (35\%)
-      \item Fisher sobre os programas: $p = 0{,}28$
-      \item Uma diferença desse tamanho é comum quando área e região não têm relação
-      \item Docentes no Sudeste: 60\% e 45\%, apresentados como descrição
+      \item É a única região com mais programas de Astronomia/Física do que de Química
+      \item Nas duas áreas os programas do Sudeste são maiores: 35 e 41 docentes em média, contra 25 e 26 nas demais regiões
+      \item Centro-Oeste: 9 programas de Química (12,5\%) e 3 de Astronomia/Física (4,8\%)
     \end{itemize}
   \end{columns}
 \end{frame}
 
-% ====================================================================== 14
-\begin{frame}{P1 $\cdot$ Gráfico da nota por região}
-  \begin{columns}[T]
-    \column{0.64\textwidth}
-    \trecho{p1_ggplot.R}
-    \column{0.32\textwidth}
-    \small
-    \begin{itemize}
-      \item \cod{geom\_col}: barras empilhadas com o número de programas
-      \item \cod{p1\_cinzas}: a nota é uma categoria ordenada e recebe uma escala de cinzas
-      \item \cod{position\_stack}: o número de programas no centro de cada segmento
-      \item \cod{facet\_wrap}: um painel por área
-    \end{itemize}
-  \end{columns}
-\end{frame}
-
-% ====================================================================== 15
 \begin{frame}{P1 $\cdot$ Nota dos programas por região}
   \begin{columns}[c]
     \column{0.65\textwidth}
@@ -381,70 +298,25 @@
     \column{0.32\textwidth}
     \small
     \begin{itemize}
-      \item Nota 6 ou 7: 21 de 55 programas no Sudeste (38\%) e 4 de 30 no Nordeste (13\%)
-      \item Kruskal-Wallis com as duas áreas: $H = 15{,}3$, $p = 0{,}004$
-      \item Por área: $p = 0{,}003$ na Química e $p = 0{,}49$ em Astronomia/Física
-      \item Astronomia/Física tem 2 programas no Norte e 3 no Centro-Oeste
-      \item Nota entre as áreas: medianas 5 e 4, Mann-Whitney $p = 0{,}16$
+      \item Nota 6 ou 7: 17 dos 60 programas de Astronomia/Física e 20 dos 71 de Química
+      \item Nota 3: 16 programas de Química e 5 de Astronomia/Física
+      \item Química: 13 dos 16 programas de nota 3 estão no Norte, Nordeste e Centro-Oeste
+      \item Nota 7 no Sudeste: 8 dos 11 de Astronomia/Física e 6 dos 10 de Química
     \end{itemize}
   \end{columns}
 \end{frame}
 
-% ====================================================================== 16
 \begin{frame}{Síntese da P1}
-  \begin{columns}[T]
-    \column{0.47\textwidth}
-    \cab{Os dados mostram}
-    \begin{itemize}
-      \item Com 134 programas, a diferença regional entre as áreas não se distingue da variação casual
-      \item A nota está associada à região: o Sudeste tem 42\% dos programas avaliados e 57\% dos de nota 6 ou 7
-      \item Nas duas áreas, 28\% dos programas têm nota 6 ou 7
-    \end{itemize}
-    \column{0.47\textwidth}
-    \cab{Os dados não permitem afirmar}
-    \begin{itemize}
-      \item Que a relação entre nota e região exista só na Química: um teste significativo e outro não significativo não comparam as áreas entre si
-      \item Por que a nota varia entre as regiões
-      \item Algo sobre o acesso das pessoas à pós-graduação: a base não registra a origem de docentes e discentes
-    \end{itemize}
-  \end{columns}
+  \begin{itemize}
+    \item Astronomia/Física tem metade dos programas no Sudeste (32 de 62); a Química se distribui mais entre as regiões (25 de 72 no Sudeste)
+    \item Nas duas áreas, os programas do Sudeste são maiores e concentram a maior parte das notas 7 (14 de 21)
+    \item No topo as áreas se parecem: 17 dos 60 programas de Astronomia/Física e 20 dos 71 de Química têm nota 6 ou 7
+    \item A diferença está na base: a Química tem 16 programas de nota 3, quase todos no Norte, Nordeste e Centro-Oeste; Astronomia/Física tem 5
+    \item É uma descrição das distribuições em 2024, sem testes estatísticos
+    \item Com poucos programas no Norte e no Centro-Oeste (18 no total), as comparações nessas regiões ficam ainda mais frágeis
+  \end{itemize}
 \end{frame}
 
-% ====================================================================== 17
-\begin{frame}{P2 $\cdot$ Consulta e modelo}
-  \begin{columns}[T]
-    \column{0.64\textwidth}
-    \trecho{p2_consulta.R}
-    \trecho{p2_prog.R}
-    \trecho{p2_modelo.R}
-    \trecho{p2_interacao.R}
-    \column{0.32\textwidth}
-    \small
-    \begin{itemize}
-      \item \cod{DISTINCT ON}: cada docente conta uma vez por área e ano, no programa de nota mais alta
-      \item \cod{cbind}: a resposta são os bolsistas e os não bolsistas de cada programa
-      \item \cod{quasibinomial}: erros-padrão corrigidos pela variação entre programas
-      \item \cod{anova} com teste F: o efeito da nota é o mesmo nas duas áreas?
-    \end{itemize}
-  \end{columns}
-\end{frame}
-
-% ====================================================================== 18
-\begin{frame}{P2 $\cdot$ Gráfico por programa}
-  \begin{columns}[T]
-    \column{0.64\textwidth}
-    \trecho{p2_ggplot.R}
-    \column{0.32\textwidth}
-    \small
-    \begin{itemize}
-      \item \cod{geom\_point}: um ponto por programa, com deslocamento lateral para não sobrepor
-      \item \cod{geom\_errorbar} com \cod{ymin = ymax}: um traço no percentual do conjunto de docentes da área e da nota
-      \item \cod{cores\_area}: cada área tem a mesma cor em todos os gráficos
-    \end{itemize}
-  \end{columns}
-\end{frame}
-
-% ====================================================================== 19
 \begin{frame}{P2 $\cdot$ Bolsistas de produtividade por nota do programa}
   \begin{columns}[c]
     \column{0.63\textwidth}
@@ -452,210 +324,67 @@
     \column{0.34\textwidth}
     \small
     \begin{itemize}
-      \item 2024: 58,0\% dos docentes de Astronomia/Física e 39,4\% dos de Química têm bolsa
-      \item Da nota 3 à nota 7: de 28\% a 66\% e de 9\% a 58\%
-      \item Entre os programas: de 7\% a 97\% e de 0\% a 84\%
-      \item Programas de mesma área e mesma nota diferem em dezenas de pontos percentuais
+      \item Em 2024, 1015 dos 1749 docentes de Astronomia/Física têm bolsa de produtividade do CNPq (58\%); na Química, 824 de 2090 (39\%)
+      \item Nas duas áreas a proporção é maior nas notas mais altas: de 28\% (nota 3) a 66\% (nota 7) na Física e de 9\% a 58\% na Química
+      \item A Química fica abaixo em todas as notas; a menor distância é na nota 7 (66\% e 58\%)
+      \item Cada ponto é um programa: na nota 4 da Física, os programas vão de 13\% a 89\% de bolsistas
     \end{itemize}
   \end{columns}
 \end{frame}
 
-% ====================================================================== 20
-\begin{frame}{P2 $\cdot$ Regressão logística sobre os programas}
-  \begin{columns}[T]
-    \column{0.50\textwidth}
-    \small
-    \begin{tabular}{@{}lcc@{}}
-      \toprule
-      termo & razão de chances & IC 95\% \\
-      \midrule
-      Química & 0,52 & 0,42 a 0,64 \\
-      nota 3  & 0,33 & 0,19 a 0,58 \\
-      nota 5  & 2,00 & 1,48 a 2,69 \\
-      nota 6  & 2,06 & 1,49 a 2,84 \\
-      nota 7  & 3,00 & 2,28 a 3,94 \\
-      \bottomrule
-    \end{tabular}
-
-    \vspace{0.6em}
-    \fonte{Referência: Astronomia/Física, nota 4. 131 programas e 3839 docentes.\\
-           Dispersão estimada: 2,32.}
-    \column{0.46\textwidth}
-    \small
-    \begin{itemize}
-      \item Nota como tendência linear: razão de chances de 1,49 por ponto (IC 95\% de 1,37 a 1,61)
-      \item Notas 5 e 6 têm razões quase iguais
-      \item Interação área $\times$ nota: $p = 0{,}10$ com a nota em categorias e $p = 0{,}006$ com a nota como tendência
-      \item Tendência em cada área: 1,31 por ponto em Astronomia/Física e 1,65 em Química
-    \end{itemize}
-  \end{columns}
-\end{frame}
-
-% ====================================================================== 21
 \begin{frame}{Síntese da P2}
-  \begin{columns}[T]
-    \column{0.47\textwidth}
-    \cab{Os dados mostram}
-    \begin{itemize}
-      \item Em programas de mesma nota, a bolsa de produtividade é menos frequente na Química (razão de chances 0,52)
-      \item A proporção de bolsistas cresce com a nota nas duas áreas
-      \item De 2021 a 2024 os percentuais ficaram entre 57\% e 58\% em Astronomia/Física e entre 39\% e 40\% na Química
-    \end{itemize}
-    \column{0.47\textwidth}
-    \cab{Os dados não permitem afirmar}
-    \begin{itemize}
-      \item Que a nota atraia bolsas ou que as bolsas elevem a nota: a Quadrienal 2017--2020 avaliou em parte a produção desses mesmos docentes
-      \item Que a diferença entre as áreas meça desempenho: as bolsas são distribuídas por área no CNPq
-      \item Que o aumento com a nota seja mais forte na Química: o resultado muda com a forma de incluir a nota no modelo
-    \end{itemize}
-  \end{columns}
+  \begin{itemize}
+    \item Astronomia/Física tem proporcionalmente mais bolsistas de produtividade: 58\% dos docentes, contra 39\% na Química
+    \item Nas duas áreas os bolsistas são mais frequentes nos programas de nota mais alta
+    \item A distância entre as áreas é grande nas notas 3 e 4 (28\% e 9\%; 47\% e 25\%) e pequena na nota 7 (66\% e 58\%)
+    \item 7 dos 71 programas de Química não têm nenhum bolsista; na Física, todos têm ao menos um
+    \item O quadro quase não muda de 2021 a 2024: entre 57\% e 58\% na Física e entre 39\% e 40\% na Química
+    \item É uma descrição dos docentes, sem testes estatísticos: não dá para dizer o que produz a diferença entre as áreas
+    \item Fica a pergunta: as bolsas são distribuídas por área no CNPq; quanto da diferença vem dessa divisão?
+  \end{itemize}
 \end{frame}
 
-
-% ====================================================================== 22
-\begin{frame}{P3 $\cdot$ Consulta e modelo}
-  \begin{columns}[T]
-    \column{0.64\textwidth}
-    \trecho[codigomenor]{p3_variavel.R}
-    \trecho[codigomenor]{p3_prog.R}
-    \trecho[codigomenor]{p3_modelo.R}
-
-    \column{0.32\textwidth}
-    \small
-    \begin{itemize}
-      \item \cod{DISTINCT ON}: um docente por área e ano,
-      associado ao programa de maior nota
-
-      \item \cod{exterior}: último grau obtido
-      fora do Brasil (1) ou no Brasil (0)
-
-      \item \cod{prop.test}: comparação das
-      proporções entre as duas áreas
-
-      \item \cod{glm}: regressão logística
-      com área e nota como explicativas
-
-      \item \cod{anova}: teste da interação
-      área $\times$ nota
-    \end{itemize}
-  \end{columns}
-\end{frame}
-
-
-% ====================================================================== 23
 \begin{frame}{P3 $\cdot$ Último grau no exterior por nota do programa}
   \begin{columns}[c]
     \column{0.63\textwidth}
-    \includegraphics[width=\linewidth]
-      {figuras_v2/P3_exterior_por_nota.pdf}
-
+    \includegraphics[width=\linewidth]{figuras_v2/P3_exterior_por_nota_programas.pdf}
     \column{0.34\textwidth}
     \small
     \begin{itemize}
-      \item 2024: 22,3\% em Astronomia/Física
-      e 8,6\% em Química
-
-      \item Comparação entre áreas:
-      $p < 0{,}001$
-
-      \item Química: razão de chances de
-      0,36 (IC 95\%: 0,29 a 0,43)
-
-      \item Nota 7: razão de chances de
-      3,01 (IC 95\%: 2,29 a 3,95),
-      em relação à nota 4
-
-      \item Interação área $\times$ nota:
-      $p = 0{,}27$
+      \item Em 2024, 390 dos 1749 docentes de Astronomia/Física obtiveram o último grau no exterior (22\%); na Química, 179 de 2090 (9\%)
+      \item Na Física a proporção fica entre 14\% e 30\% conforme a nota; na Química, entre 3\% e 14\%
+      \item O valor mais alto está na nota 7 nas duas áreas; a Química na nota 7 (14\%) fica no nível da Física na nota 4 (14\%)
+      \item Cada ponto é um programa: na Química, há programas sem nenhum docente titulado fora nas notas 3 a 6
     \end{itemize}
   \end{columns}
 \end{frame}
 
-
-% ====================================================================== 24
 \begin{frame}{P3 $\cdot$ País do último grau}
   \begin{columns}[c]
     \column{0.60\textwidth}
-    \includegraphics[width=\linewidth]
-      {figuras_v2/P3_paises_titulacao.pdf}
-
+    \includegraphics[width=\linewidth]{figuras_v2/P3_paises_titulacao.pdf}
     \column{0.37\textwidth}
     \small
     \begin{itemize}
-      \item Astronomia/Física:
-      Estados Unidos (4,9\%),
-      França e Reino Unido (3,1\% cada)
-
-      \item Química:
-      França (1,9\%), Estados Unidos
-      (1,5\%) e Reino Unido (1,3\%)
-
-      \item Os oito países mais frequentes
-      são apresentados separadamente
-
-      \item Os percentuais consideram
-      todos os docentes de cada área
+      \item Astronomia/Física: Estados Unidos (85 docentes), França (55), Reino Unido (55) e Alemanha (39)
+      \item Química: França (39), Estados Unidos (31), Reino Unido (27) e Alemanha (20)
+      \item Os mesmos quatro países lideram nas duas áreas; na Química a França vem primeiro
     \end{itemize}
   \end{columns}
 \end{frame}
 
-
-
-% ====================================================================== 25
 \begin{frame}{Síntese da P3}
-  \begin{columns}[T]
-    \column{0.47\textwidth}
-    \cab{Os dados mostram}
-    \begin{itemize}
-      \item O último grau no exterior é
-      significativamente mais frequente
-      em Astronomia/Física
-
-      \item As notas 5, 6 e 7 apresentam
-      maiores chances de formação no
-      exterior em relação à nota 4
-
-      \item Não foi detectada interação
-      significativa entre área e nota
-
-      \item De 2021 a 2024, a diferença
-      entre as áreas permaneceu estável
-    \end{itemize}
-
-    \column{0.47\textwidth}
-    \cab{Os dados não permitem afirmar}
-    \begin{itemize}
-      \item Quantos docentes realizaram
-      doutorado sanduíche ou pós-doutorado
-
-      \item Quantos são brasileiros
-      titulados no exterior ou
-      estrangeiros contratados no Brasil
-
-      \item Que a formação no exterior
-      determine a nota do programa
-    \end{itemize}
-  \end{columns}
+  \begin{itemize}
+    \item O último grau no exterior é mais de duas vezes mais frequente em Astronomia/Física: 22\% dos docentes, contra 9\% na Química
+    \item Nas duas áreas, a proporção é maior nos programas de nota 7
+    \item Estados Unidos, França, Reino Unido e Alemanha concentram a maior parte dos títulos obtidos fora
+    \item De 2021 a 2024 os valores quase não mudam: perto de 22\% na Física e de 9\% na Química
+    \item É uma descrição, sem testes estatísticos
+    \item A variável é o país do último grau: não registra doutorado sanduíche nem pós-doutorado no exterior
+    \item Fica a pergunta: a diferença vem de mais brasileiros formados fora ou de mais estrangeiros contratados? A base não separa os dois casos
+  \end{itemize}
 \end{frame}
 
-
-% ====================================================================== 26
-\begin{frame}{P4 $\cdot$ Gráfico dos titulados por ano}
-  \begin{columns}[T]
-    \column{0.64\textwidth}
-    \trecho{p4_ggplot.R}
-    \column{0.32\textwidth}
-    \small
-    \begin{itemize}
-      \item \cod{geom\_line} e \cod{geom\_point}: uma série por área
-      \item \cod{facet\_wrap}: um painel para o mestrado e outro para o doutorado
-      \item O segundo \cod{geom\_text} escreve o nome da área no fim da linha e dispensa a legenda
-      \item O eixo vertical começa em zero
-    \end{itemize}
-  \end{columns}
-\end{frame}
-
-% ====================================================================== 27
 \begin{frame}{P4 $\cdot$ Titulados por ano}
   \begin{columns}[c]
     \column{0.65\textwidth}
@@ -663,33 +392,14 @@
     \column{0.32\textwidth}
     \small
     \begin{itemize}
-      \item Astronomia/Física: 2222 mestres e 1511 doutores no quadriênio
-      \item Química: 3461 mestres e 2609 doutores
-      \item A Química titulou 1,56 vez o número de mestres e 1,73 vez o de doutores
-      \item A Química também tem mais programas (74 e 65) e mais docentes
+      \item De 2021 a 2024, a Química titulou 3461 mestres e 2609 doutores; Astronomia/Física, 2222 e 1511
+      \item Doutores por ano na Química: de 580 para 703; na Física, entre 361 e 399
+      \item Mestres por ano: de 503 para 582 na Física; na Química, entre 844 e 882
+      \item A Química também é maior: 74 programas, contra 65
     \end{itemize}
   \end{columns}
 \end{frame}
 
-% ====================================================================== 28
-\begin{frame}{P4 $\cdot$ Consulta por programa e modelo}
-  \begin{columns}[T]
-    \column{0.62\textwidth}
-    \trecho{p4_consulta.R}
-    \trecho{p4_modelo.R}
-    \column{0.34\textwidth}
-    \small
-    \begin{itemize}
-      \item \cod{WITH}: duas subconsultas agregadas por programa
-      \item Docentes-ano: soma dos docentes do programa nos quatro anos
-      \item \cod{LEFT JOIN} e \cod{COALESCE}: programa sem titulados entra com zero
-      \item \cod{offset}: o modelo descreve titulados por docente por ano
-      \item \cod{quasipoisson}: erros-padrão corrigidos pela variação entre programas
-    \end{itemize}
-  \end{columns}
-\end{frame}
-
-% ====================================================================== 29
 \begin{frame}{P4 $\cdot$ Titulados por docente por ano}
   \begin{columns}[c]
     \column{0.67\textwidth}
@@ -697,63 +407,38 @@
     \column{0.30\textwidth}
     \small
     \begin{itemize}
-      \item Doutores por docente por ano: 0,23 em Astronomia/Física e 0,33 na Química
-      \item Mestres: 0,30 e 0,40
-      \item Razão de taxas da Química: 1,49 para doutores (IC 95\% de 1,25 a 1,78) e 1,29 para mestres (1,15 a 1,45)
-      \item Doutores, interação área $\times$ nota: $p = 0{,}029$
-      \item Doutores na nota 4: 0,23 e 0,22; na nota 7: 0,22 e 0,42
+      \item Taxa: titulados do programa no quadriênio divididos pela soma dos seus docentes em cada ano
+      \item Doutores por docente por ano: 0,23 na Física e 0,33 na Química
+      \item Mestres: 0,30 e 0,40; a maior taxa é a dos programas de Química de nota 3 (0,54), quase todos só de mestrado
+      \item Na Física a taxa de doutores quase não muda com a nota; na Química vai de 0,22 (nota 4) a 0,42 (nota 7)
     \end{itemize}
   \end{columns}
 \end{frame}
 
-% ====================================================================== 30
 \begin{frame}{Síntese da P4}
-  \begin{columns}[T]
-    \column{0.47\textwidth}
-    \cab{Os dados mostram}
-    \begin{itemize}
-      \item A Química titulou mais mestres e mais doutores no quadriênio, em número absoluto e por docente
-      \item No doutorado, a diferença por docente aparece nos programas de nota 5 a 7
-      \item Em Astronomia/Física a taxa de doutores fica entre 0,22 e 0,25 em todas as notas
-    \end{itemize}
-    \column{0.47\textwidth}
-    \cab{Os dados não permitem afirmar}
-    \begin{itemize}
-      \item Que a taxa meça eficiência: ela não considera quantos discentes ingressaram nem o tempo até a titulação
-      \item Que programas só de mestrado e programas com doutorado sejam comparáveis: o denominador é o corpo docente inteiro nos dois casos
-      \item Como se comportam os doutorados recentes: 2 programas de Química com doutorado não titularam doutores no período
-    \end{itemize}
-  \end{columns}
+  \begin{itemize}
+    \item A Química titulou mais mestres e mais doutores, em número absoluto e por docente
+    \item O número de doutores titulados por ano cresceu na Química (580 para 703) e ficou estável na Física
+    \item Na nota 4 as duas áreas titulam doutores no mesmo ritmo (0,23 e 0,22 por docente por ano); a diferença aparece nas notas 5, 6 e 7
+    \item Nos programas de nota 7, a Química titula quase o dobro de doutores por docente (0,42 e 0,22)
+    \item Fica a curiosidade: na Química os doutorandos matriculados caíram de 3581 (2021) para 3138 (2024), enquanto os titulados por ano subiram; na Física, os matriculados ficaram entre 2035 e 2099
+    \item É uma descrição, sem testes estatísticos
+    \item A taxa não mede eficiência: a base não diz quantos discentes ingressaram, quanto tempo levaram nem quantos desistiram
+  \end{itemize}
 \end{frame}
 
-% ====================================================================== 31
 \begin{frame}{Resultados e limitações}
   \small
-  \begin{tabular}{@{}l>{\raggedright\arraybackslash}p{0.88\textwidth}@{}}
-    \toprule
-    \textbf{P1} & A distribuição regional dos programas não difere de forma detectável entre as áreas ($p = 0{,}28$). A nota varia entre as regiões ($p = 0{,}004$). \\
-    \addlinespace
-    \textbf{P2} & Em programas de mesma nota, a bolsa de produtividade é menos frequente na Química (razão de chances 0,52) e cresce com a nota (1,49 por ponto). \\
-    \addlinespace
-    \textbf{P3} & O último grau no exterior é mais frequente em Astronomia/Física (22,3\%) do que em Química (8,6\%). A razão de chances ajustada da Química é 0,36, e a nota 7 apresenta razão de chances de 3,01 em relação à nota 4. \\
-    \addlinespace
-    \textbf{P4} & A Química titulou 3461 mestres e 2609 doutores; Astronomia/Física, 2222 e 1511. Por docente, a razão de taxas é 1,29 para mestres e 1,49 para doutores. \\
-    \bottomrule
-  \end{tabular}
-
-  \vspace{0.9em}
-  \begin{columns}[T]
-    \column{0.47\textwidth}
-    \begin{itemize}
-      \item Os dados são informados pelos próprios programas à CAPES
-      \item Há uma única avaliação no período, a de 2017--2020
-    \end{itemize}
-    \column{0.47\textwidth}
-    \begin{itemize}
-      \item Norte e Centro-Oeste somam 18 dos 131 programas com nota
-      \item A base não registra a produção, a trajetória nem a origem das pessoas
-    \end{itemize}
-  \end{columns}
+  \begin{itemize}
+    \item Metade dos programas de Astronomia/Física está no Sudeste (32 de 62); a Química tem mais programas nas outras regiões, e 15 dos seus 16 programas de nota 3 estão fora do Sudeste
+    \item Nota 6 ou 7: 17 dos 60 programas de Astronomia/Física e 20 dos 71 de Química
+    \item Os docentes de Astronomia/Física têm mais bolsa de produtividade (58\% e 39\%) e mais títulos obtidos no exterior (22\% e 9\%)
+    \item A Química titula mais mestres e doutores, em número e por docente
+    \item Nas duas áreas, bolsa e título no exterior são mais frequentes nos programas de nota mais alta
+    \item Curiosidade: a área com menos bolsistas e menos títulos do exterior é a que mais titula por docente
+    \item Tudo aqui é descrição das distribuições, sem testes estatísticos: os números não permitem afirmar causas nem que as diferenças vão além da variação casual
+    \item Os dados são declarados pelos programas; a nota é a da avaliação 2017--2020 (o resultado de 2021--2024 saiu depois dos dados); a base não registra produção, trajetória nem origem das pessoas
+  \end{itemize}
 \end{frame}
 
 \end{document}
