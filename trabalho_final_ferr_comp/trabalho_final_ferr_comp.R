@@ -11,8 +11,7 @@
 #   PARTE 1  monta a base de dados (ou restaura, ou só conecta; ver MODO_BASE)
 #   PARTE 2  deixa prontos a conexão, as pastas de saída e algumas funções
 #            usadas por todas as análises
-#   PARTE 3  análises estatísticas: cada integrante cola o seu bloco
-#            (P1, P2, P3 ou P4) ABAIXO DA ÚLTIMA LINHA deste arquivo
+#   PARTE 3  análises estatísticas (P1 a P4)
 #
 # Pacotes: tidyverse, DBI, RPostgres
 #   install.packages(c("tidyverse", "DBI", "RPostgres"))
@@ -54,11 +53,9 @@ dir.create(pasta_base, showWarnings = FALSE, recursive = TRUE)
 if (MODO_BASE == "construir") {
 
   #! 1.1 Criação das tabelas ----------------------------------------------
-  # Mesma estrutura da aula de SQL:
-  #   tabelas de referência (ref_): guardam cada área, instituição e
-  #     programa UMA vez só;
-  #   tabelas de dados (tab_): guardam os registros de docentes e discentes
-  #     e apontam para as de referência por chave estrangeira.
+  # Tabelas de referência (ref_): cada área, instituição e programa uma única vez.
+  # Tabelas de dados (tab_): registros de docentes e discentes, ligados às de
+  # referência por chave estrangeira.
   # DROP SCHEMA apaga e recria só o esquema do trabalho.
 
   comandos_sql <- c(
@@ -157,7 +154,7 @@ if (MODO_BASE == "construir") {
       bind_rows()
   }
 
-  # Mesma função da aula: troca a coluna-código X pelo identificador Z da
+  # Troca a coluna-código X pelo identificador Z da
   # tabela de referência tabY (via left_join com a tabela que está na base).
   trocar_id <- function(con, df, X, Z, tabY){
     tab <- dbGetQuery(con, paste0("SELECT ", X, ",", Z, " FROM ", tabY, ";"))
@@ -302,7 +299,6 @@ dbGetQuery(con, "
 # ==========================================================================
 # PARTE 2. OBJETOS COMUNS ÀS ANÁLISES
 # ==========================================================================
-# Os blocos de análise da PARTE 3 usam o que está definido aqui.
 
 # Pastas de saída
 pasta_figuras <- file.path(path.expand(pasta_trabalho), "figuras")
@@ -333,20 +329,18 @@ rotulo_area <- function(x) recode(x, "ASTRONOMIA / FÍSICA" = "Astronomia/Físic
 # Nota do programa em categorias. Só UM programa tem nota 2 (em
 # Astronomia/Física); sozinho ele não sustenta uma categoria, por isso
 # entra com os de nota 3 em "3 ou menos". Programas novos (conceito "A")
-# ficam de fora das análises por nota (filtrar antes com nota != "A").
+# ficam de fora das análises por nota.
 nota_categoria <- function(nota) {
   factor(if_else(nota %in% c("2", "3"), "3 ou menos", nota),
          levels = c("3 ou menos", "4", "5", "6", "7"))
 }
 
-# Uma cor fixa para cada área em todos os gráficos (paleta testada para
-# daltonismo e para impressão em tons de cinza)
+# Uma cor fixa para cada área em todos os gráficos
 cores_area <- c("Astronomia/Física" = "#2a78d6", "Química" = "#eb6834")
 
 
 # ==========================================================================
 # PARTE 3. ANÁLISES ESTATÍSTICAS
-# Cole o seu bloco (P1, P2, P3 ou P4) abaixo da última linha.
 # ==========================================================================
 
 
